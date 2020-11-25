@@ -1,0 +1,165 @@
+---
+title: "Web Mapping with R"
+author: "Aateka Shashank"
+date: "27/11/2020"
+output: html_document
+---
+
+## Web Mapping with Leaflet
+
+Leaflet is a Javascript library. We are going to use Leaflet in R, a programming language we are most comfortable using :)
+
+A few pages we also want to keep open for reference are the [CRAN Leaflet R package documentation](https://cran.r-project.org/web/packages/leaflet/leaflet.pdf) and the [Leaflet JS documentation](https://leafletjs.com/reference-1.7.1.html). Both are helpful to guide us when we want to make more adjustments to the attributes for each function.
+
+```{r setup}
+#install.packages("leaflet", "tidyverse", "sp", "sf", "maps")
+library(leaflet)
+library(magrittr)
+```
+
+When you install leaflet, you'll notice it also installs the following packages:
+
+> also installing the dependencies ‘prettyunits’, ‘pkgbuild’, ‘rstudioapi’, ‘diffobj’, ‘rematch2’, ‘brio’, ‘callr’, ‘desc’, ‘pkgload’, ‘praise’, ‘processx’, ‘ps’, ‘waldo’, ‘testthat’, ‘colorspace’, ‘gtable’, ‘isoband’, ‘withr’, ‘lazyeval’, ‘farver’, ‘labeling’, ‘munsell’, ‘viridisLite’, ‘ggplot2’, ‘gridExtra’, ‘crosstalk’, ‘htmlwidgets’, ‘png’, ‘RColorBrewer’, ‘raster’, ‘scales’, ‘viridis’, ‘leaflet.providers’
+
+Some of these packages are ones you might already know: viridis, ggplot2, RColorBrewer. One of these, in particular, 'raster' is a package that is used for spatial analysis of raster data. For more information on how to analyze raster data in R, you can check out [this](https://datacarpentry.org/r-raster-vector-geospatial/) online workshop.
+
+You might also get a warning like this when you load the leaflet package:
+
+> Registered S3 method overwritten by 'htmlwidgets':
+  method           from         
+  print.htmlwidget tools:rstudio
+
+This just means that the same method has been defined by two packages and the one that has been loaded most recently will be the one used to define that method.
+
+
+## Your First Leaflet Map in R!
+
+Here are the core components:
+- a basemap
+- your data (markers, pop ups, points/lines/polygons, raster images, analysis)
+
+Let's start with a basemap and a marker with a popup.
+
+```{r first map}
+m <- leaflet() %>% # Creates a leaflet map widget
+  addTiles() %>%  # Adds a default OpenStreetMap map tiles as the basemap
+  addMarkers(lng=-123.085269, lat=49.281178, popup="Prototype Cafe; on the want-to-try list") # Adds the marker and the popup together
+m  # Prints out the map
+```
+
+Et voila! Your first Leaflet map! <span style="color:maroon">*pat on back*</span>
+
+Now let's tweak with some of the attributes on these functions.
+
+## Tweaking Map Attributes
+
+Let's talk about zoom levels on a tile. For Open Street Maps, [these](https://wiki.openstreetmap.org/wiki/Zoom_levels) levels run from 0 to 20
+
+```{r tweak zoom levels}
+t1 <- leaflet(options = leafletOptions(minZoom = 7, maxZoom = 18)) %>%
+  addTiles() %>%
+  addMarkers(lng=-123.085269, lat=49.281178, popup="Prototype Cafe; on the want-to-try list")
+t1
+```
+
+Why choose [18](https://developer.tomtom.com/blog/decoded/understanding-map-tile-grids-and-zoom-levels) as the maximum zoom level?
+Why choose 0 as the minimum?
+
+There are [other arguments](https://cran.r-project.org/web/packages/leaflet/leaflet.pdf)(p. 38) that can be passed in the leaflet() function such as the width and height of your resulting widget.
+
+```{r tweak widget size}
+t2 <- leaflet(width = 600, height = 400, options = leafletOptions(minZoom = 7, maxZoom = 18)) %>%
+  addTiles() %>%
+  addMarkers(lng=-123.085269, lat=49.281178, popup="Prototype Cafe; on the want-to-try list")
+t2
+```
+
+We can also change the [basemap](https://carto.com/help/building-maps/basemap-list/) if we are going for a more minimalistic look. We do this by tweaking the addTiles() function. Let's try the Dark Matter theme from CartoDB.
+
+```{r tweak basemap}
+t3 <- leaflet(width = 600, height = 400) %>% 
+  addTiles("http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+attribution = paste(
+"&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap</a> contributors",
+"&copy; <a href=\"http://cartodb.com/attributions\">CartoDB</a>"
+)
+) %>% setView(-123.085, 49.281, zoom = 15) %>%
+  addMarkers(lng=-123.085269, lat=49.281178, popup="Prototype Cafe; on the want-to-try list")
+t3
+```
+
+The other way of doing this is using the addProviderTiles () function. [Here](http://leaflet-extras.github.io/leaflet-providers/preview/index.html) is where you can find all the providers for tiles to Leaflet. Within the function, the providers$ argument will give you a list of provider options.
+
+[Some providers](https://github.com/leaflet-extras/leaflet-providers) might require registration for an API key.
+
+```{r tweak basemap version2}
+t4 <- leaflet(width = 600, height = 400) %>% 
+  setView(-123.085, 49.281, zoom = 15) %>%
+  addMarkers(lng=-123.085269, lat=49.281178, popup="Prototype Cafe; on the want-to-try list") %>%
+  addProviderTiles(providers$CartoDB.Voyager)
+t4
+```
+
+We can also change the kind of the marker that is placed on the map. addMarkers() just adds in the typical placemarker pin. addCircleMarkers() adds a circle shaped marker that can be further aesthetically tweaked, much like the addMarkers() function.
+
+```{r tweak marker}
+t5 <- leaflet(width = 600, height = 400) %>%
+  setView(-123.08, 49.281, zoom = 13) %>%
+  addProviderTiles(providers$CartoDB.VoyagerLabelsUnder) %>%
+  addCircleMarkers(color = c("brown"), fill = FALSE, opacity = 0.7, 
+                   radius = 4, weight = 2,
+                   lng=-123.085269, lat=49.281178,
+                   popup="Prototype Cafe; on the want-to-try list")
+t5
+```
+
+The aesthetic tweaks can be endless! So let's add some data into this mix!
+
+##Adding Data to Your Webmap
+
+Lets try a WMS tile. Let's pull [Recreational Trails](https://catalogue.data.gov.bc.ca/dataset/recreation-line) from the BC Open Data Catalogue.
+
+```{r WMS tile}
+trails <- leaflet() %>% 
+  addTiles() %>% setView(-123.08, 49.281, zoom = 10) %>%
+  addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  addWMSTiles("https://openmaps.gov.bc.ca/geo/pub/WHSE_FOREST_TENURE.FTEN_RECREATION_LINES_SVW/ows?SERVICE=WMS&",
+              layers = "WHSE_FOREST_TENURE.FTEN_RECREATION_LINES_SVW",
+              options = WMSTileOptions(format = "image/png", transparent = TRUE))
+trails
+```
+
+Let's try a basic shapefile. We're going to bring in the [*local area boundary*](https://opendata.vancouver.ca/explore/dataset/local-area-boundary/information/) shapefile from the Vancouver Open Data Catalogue. This shapefile shows the neighbourhoods in the City of Vancouver. We're going to use the [sf package](https://datacarpentry.org/r-raster-vector-geospatial/06-vector-open-shapefile-in-r/index.html) to read in the shapefile and then map it on a basemap. 
+
+```{r shapefile}
+library(sf)
+nbh <- st_read("local-area-boundary.shp")
+van <- leaflet() %>%
+  addProviderTiles(providers$CartoDB.Voyager) %>%
+  setView(-123.08, 49.281, zoom = 11) %>%
+  addPolygons(data = nbh, color = "#444444", weight = 1, smoothFactor = 0.5,
+              opacity = 1.0, fillOpacity = 0.3,
+              fillColor = "brown",
+              highlightOptions = highlightOptions(color = "white",
+                                                  weight = 2,
+                                                  bringToFront = TRUE))
+van
+```
+
+Let's add some points to this map from a CSV file.
+
+```{r csv}
+cafes <- read.csv("Cafes.csv", header = TRUE)
+van2 <- leaflet() %>%
+  addProviderTiles(providers$CartoDB.Voyager) %>%
+  setView(-123.08, 49.281, zoom = 12) %>%
+  addPolygons(data = nbh, color = "#444444", weight = 1, smoothFactor = 0.5,
+              opacity = 1.0, fillOpacity = 0.5,
+              fillColor = "brown") %>%
+  addCircleMarkers(data = cafes, lat = cafes$Lat, lng = cafes$Long,
+             color = "black", fill = TRUE, opacity = 1,
+             radius = 4, weight = 2,
+             popup = paste("Cafe:", cafes$Cafe, "<br>",
+                           "Visited:", cafes$Visit, "<br>"))
+van2
+```
